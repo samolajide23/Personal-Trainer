@@ -50,14 +50,14 @@ export default async function CalendarPage() {
                 <CalendarClient
                     activePlan={activePlan ? {
                         name: activePlan.name,
-                        weeks: activePlan.weeks.map((w) => ({
+                        weeks: activePlan.weeks.map((w: any) => ({
                             weekNumber: w.weekNumber,
-                            workouts: w.workouts.map((wd) => ({
+                            workouts: w.workouts.map((wd: any) => ({
                                 dayNumber: wd.dayNumber,
                                 dayOfWeek: (wd as any).dayOfWeek,
                                 name: wd.name,
                                 id: wd.id,
-                                exercises: wd.exercises.map(ex => ({
+                                exercises: wd.exercises.map((ex: any) => ({
                                     name: ex.name,
                                     sets: ex.sets,
                                     reps: ex.reps
@@ -65,7 +65,7 @@ export default async function CalendarPage() {
                             })),
                         })),
                     } : null}
-                    loggedDates={logs.map((l) => ({
+                    loggedDates={logs.map((l: any) => ({
                         date: l.loggedAt.toISOString(),
                         workoutName: l.workout.name,
                         exercises: Array.from(new Set((l as any).sets.map((s: any) => s.exercise.name))) as string[]

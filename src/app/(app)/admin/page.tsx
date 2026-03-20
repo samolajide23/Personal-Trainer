@@ -18,7 +18,7 @@ export default async function AdminPage() {
         where: { role: { in: ["COACH", "SUPER_ADMIN"] } },
         select: { id: true }
     });
-    const creativeIds = admins.map(a => a.id);
+    const creativeIds = admins.map((a: { id: string }) => a.id);
 
     const [users, plans, recentCodes] = await Promise.all([
         prisma.user.findMany({

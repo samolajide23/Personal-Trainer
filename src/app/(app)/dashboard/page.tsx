@@ -11,7 +11,7 @@ export default async function DashboardPage() {
     const { userId } = await auth();
     if (!userId) redirect("/sign-in");
 
-    let user = null;
+    let user: any = null;
 
     try {
         user = await prisma.user.findUnique({
@@ -66,7 +66,7 @@ export default async function DashboardPage() {
     const currentWeek = weeks[0] ?? null;
     const todayDayOfWeek = new Date().getDay();
 
-    let todayWorkout = null;
+    let todayWorkout: any = null;
     if (currentWeek) {
         // 1. Try to find a workout specifically assigned to this day of the week
         todayWorkout = currentWeek.workouts.find((w: any) => w.dayOfWeek === todayDayOfWeek);
