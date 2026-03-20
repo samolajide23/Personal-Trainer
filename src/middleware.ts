@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server'
 export default clerkMiddleware(async (auth, req) => {
     const { userId } = await auth();
 
-    // If signed in, skip the landing page and go straight to the dashboard
-    if (userId && req.nextUrl.pathname === '/') {
+    // If signed in, skip the landing, sign-in, and sign-up pages, go straight to the dashboard
+    if (userId && (req.nextUrl.pathname === '/' || req.nextUrl.pathname === '/sign-up' || req.nextUrl.pathname === '/sign-in')) {
         return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 })

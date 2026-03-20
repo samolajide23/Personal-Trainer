@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Dumbbell, ChevronRight, Clock, Flame, Plus, Activity, TrendingUp, Calendar, Ticket, Check } from "lucide-react";
+import { Dumbbell, ChevronRight, Clock, Flame, Plus, Activity, TrendingUp, Calendar, Ticket, Check, Edit3 } from "lucide-react";
 import { formatRelative, cn } from "@/lib/utils";
+import { isCardio } from "@/components/shared/ExerciseAutocomplete";
 
 interface Exercise {
     id: string;
@@ -23,6 +25,7 @@ interface Workout {
 
 interface RecentLog {
     id: string;
+    workoutId: string;
     workoutName: string;
     loggedAt: string;
 }
@@ -31,14 +34,39 @@ interface Props {
     user: { name?: string | null; role: string };
     activePlan: { name: string } | null;
     todayWorkout: Workout | null;
+    todayCompleted?: boolean;
     activeSession: { id: string; workoutId: string; workoutName: string } | null;
     recentLogs: RecentLog[];
+    avgDurationMin?: number;
+    weeklyMetrics?: {
+        workoutsCompleted: number;
+        totalMins: number;
+    };
 }
 
-export function DashboardClient({ user, activePlan, todayWorkout, activeSession, recentLogs }: Props) {
+export function DashboardClient({ user, activePlan, todayWorkout, todayCompleted, activeSession, recentLogs, avgDurationMin, weeklyMetrics }: Props) {
+    const router = useRouter();
     const [code, setCode] = useState("");
     const [codeStatus, setCodeStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
     const [codeMsg, setCodeMsg] = useState("");
+
+    const uncompleteLog = async (logId: string, workoutId: string) => {
+        const confirmEdit = window.confirm("Do you want to reopen this session for editing? It will move to In Progress.");
+        if (!confirmEdit) return;
+
+        try {
+            const res = await fetch(`/api/logs/${logId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "IN_PROGRESS" })
+            });
+            if (res.ok) {
+                router.push(`/plans/log/${workoutId}`);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const greeting = () => {
         const h = new Date().getHours();
@@ -73,9 +101,17 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                     <h2 className="text-2xl font-black text-fg tracking-tight">
                         {greeting()}, {user.name?.split(" ")[0] ?? "Athlete"} 👋
                     </h2>
-                    <p className="text-sm text-fg-muted mt-1 font-medium">
-                        {activePlan ? `Active plan: ${activePlan.name}` : "No active plan — pick one to get started."}
-                    </p>
+                    <div className="flex items-center gap-3 mt-1">
+                        <p className="text-sm text-fg-muted font-medium">
+                            {activePlan ? `Active plan: ${activePlan.name}` : "No active plan — pick one to get started."}
+                        </p>
+                        {avgDurationMin !== undefined && avgDurationMin > 0 && (
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-muted border border-surface-border text-[10px] font-bold text-fg-subtle uppercase tracking-widest">
+                                <Clock className="w-3 h-3 text-brand-400" />
+                                Avg {avgDurationMin} min
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {user.role === "FREE" && (
@@ -132,27 +168,35 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                 </div>
             )}
 
-            {/* Quick stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                    { label: "Streak", val: "—", icon: Flame, color: "text-warning" },
-                    { label: "This Week", val: "0", icon: Activity, color: "text-brand-400" },
-                    { label: "All Time", val: recentLogs.length.toString(), icon: TrendingUp, color: "text-success" },
-                    { label: "Next Day", val: "Tomorrow", icon: Calendar, color: "text-brand-300" },
-                ].map((s) => (
-                    <div key={s.label} className="stat-card">
-                        <s.icon className={`w-4 h-4 ${s.color} mb-1`} />
-                        <p className="stat-value text-lg">{s.val}</p>
-                        <p className="stat-label">{s.label}</p>
+            {/* Weekly Metrics */}
+            {weeklyMetrics && (
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="card p-4 flex items-center justify-between bg-gradient-to-br from-surface-card to-brand-950/10">
+                        <div>
+                            <p className="text-[9px] font-black tracking-widest uppercase text-brand-400/80 mb-0.5">This Week</p>
+                            <p className="text-2xl font-black text-fg leading-none">{weeklyMetrics.workoutsCompleted} <span className="text-sm font-semibold text-fg-muted">sessions</span></p>
+                        </div>
+                        <div className="hidden sm:flex w-10 h-10 rounded-xl bg-brand-500/10 items-center justify-center">
+                            <Activity className="w-4 h-4 text-brand-400" />
+                        </div>
                     </div>
-                ))}
-            </div>
+                    <div className="card p-4 flex items-center justify-between bg-gradient-to-br from-surface-card to-brand-950/10">
+                        <div>
+                            <p className="text-[9px] font-black tracking-widest uppercase text-brand-400/80 mb-0.5">Time Logged</p>
+                            <p className="text-2xl font-black text-fg leading-none">{weeklyMetrics.totalMins} <span className="text-sm font-semibold text-fg-muted">mins</span></p>
+                        </div>
+                        <div className="hidden sm:flex w-10 h-10 rounded-xl bg-brand-500/10 items-center justify-center">
+                            <Clock className="w-4 h-4 text-brand-400" />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Today's Workout */}
             <div>
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="heading-3">Today&apos;s Workout</h3>
-                    {todayWorkout && (
+                    {(todayWorkout && !todayCompleted) && (
                         <Link 
                             href={`/plans/log/${todayWorkout.id}`} 
                             className={cn(
@@ -166,7 +210,17 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                     )}
                 </div>
 
-                {todayWorkout ? (
+                {todayCompleted ? (
+                    <div className="card p-10 text-center space-y-4 bg-success-950/20 border-success-500/30">
+                        <Check className="w-12 h-12 text-success mx-auto opacity-80" />
+                        <div>
+                            <p className="font-black text-lg text-success uppercase tracking-tight">Session Completed</p>
+                            <p className="text-sm text-fg-muted max-w-xs mx-auto mt-2">
+                                Great job! You have crushed today&apos;s scheduled workout. Take some time to rest and recover.
+                            </p>
+                        </div>
+                    </div>
+                ) : todayWorkout ? (
                     <div className="card p-5">
                         <div className="flex items-start justify-between mb-4">
                             <div>
@@ -201,10 +255,14 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                                     </div>
                                     <div className="text-right">
                                         <p className="text-sm font-semibold text-fg">
-                                            {ex.sets} × {ex.reps}
+                                            {isCardio(ex.name)
+                                                ? `${ex.sets > 1 ? `${ex.sets} × ` : ""}${ex.reps} min`
+                                                : `${ex.sets} × ${ex.reps}`}
                                         </p>
                                         {ex.weightTargetKg && (
-                                            <p className="text-xs text-fg-muted">{ex.weightTargetKg}kg</p>
+                                            <p className="text-xs text-fg-muted">
+                                                {isCardio(ex.name) ? `Lvl ${ex.weightTargetKg}` : `${ex.weightTargetKg}kg`}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -221,11 +279,11 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                     <div className="card p-10 text-center space-y-4 bg-surface-muted/30 border-dashed">
                         <Dumbbell className="w-12 h-12 text-brand-400 mx-auto opacity-40" />
                         <div>
-                            <p className="font-black text-lg text-fg uppercase tracking-tight">Protocol Unassigned</p>
+                            <p className="font-black text-lg text-fg uppercase tracking-tight">Plan Unassigned</p>
                             <p className="text-sm text-fg-muted max-w-xs mx-auto mt-2">
                                 {activePlan 
                                     ? "Today is a scheduled rest optimization day. Recover well." 
-                                    : "You need an active training protocol to begin tracking metrics."}
+                                    : "You need an active training plan to begin tracking metrics."}
                             </p>
                         </div>
                         <Link href="/plans" className="btn-primary shadow-glow-brand-sm mx-auto px-8 h-11 text-[10px] font-black uppercase tracking-widest">
@@ -248,15 +306,29 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                 {recentLogs.length > 0 ? (
                     <div className="card divide-y divide-surface-border">
                         {recentLogs.slice(0, 5).map((log) => (
-                            <div key={log.id} className="flex items-center justify-between px-4 py-3">
+                            <Link href={`/plans/log/view/${log.id}`} key={log.id} className="flex items-center justify-between px-4 py-3 hover:bg-surface-muted/30 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-success-muted flex items-center justify-center">
                                         <Activity className="w-3.5 h-3.5 text-success" />
                                     </div>
                                     <p className="text-sm font-medium text-fg">{log.workoutName}</p>
                                 </div>
-                                <p className="text-xs text-fg-muted">{formatRelative(log.loggedAt)}</p>
-                            </div>
+                                <div className="flex items-center gap-3">
+                                    <p className="text-xs text-fg-muted">{formatRelative(log.loggedAt)}</p>
+                                    <button 
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            uncompleteLog(log.id, log.workoutId);
+                                        }}
+                                        className="btn-icon w-7 h-7 bg-surface-elevated hover:bg-brand-500 hover:text-white transition-all shadow-sm"
+                                        title="Uncomplete and Edit"
+                                    >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <ChevronRight className="w-4 h-4 text-fg-subtle" />
+                                </div>
+                            </Link>
                         ))}
                     </div>
                 ) : (
@@ -265,6 +337,18 @@ export function DashboardClient({ user, activePlan, todayWorkout, activeSession,
                     </div>
                 )}
             </div>
+
+            {user.role === "FREE" && (
+                <div className="card p-6 bg-brand-950/10 border-brand-500/10 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                    <div>
+                        <h4 className="text-sm font-bold text-fg">Ready for more?</h4>
+                        <p className="text-xs text-fg-muted">Reach out to your coach for an access code to unlock Premium insights, chat, and check-ins.</p>
+                    </div>
+                    <Link href="/settings" className="btn-secondary btn-sm shrink-0 font-bold uppercase tracking-wide text-[10px]">
+                        Redeem Code
+                    </Link>
+                </div>
+            )}
         </div>
     );
 }

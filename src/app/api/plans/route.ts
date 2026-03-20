@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { randomBytes } from "crypto";
 
 const planSchema = z.object({
     name: z.string().min(1),
@@ -69,6 +70,8 @@ export async function POST(req: Request) {
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
     const { name, description, type, weeks } = parsed.data;
+    
+    const shareCode = randomBytes(4).toString("hex").toUpperCase();
 
     const plan = await prisma.plan.create({
         data: {
@@ -76,6 +79,7 @@ export async function POST(req: Request) {
             description,
             type: type as never,
             creatorId: user.id,
+            shareCode,
             weeks: {
                 create: weeks.map((w) => ({
                     weekNumber: w.weekNumber,

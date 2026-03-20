@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
     Plus, Dumbbell, Calendar, ChevronRight, Star,
-    MoreVertical, Trash2, Play, Ticket,
+    MoreVertical, Trash2, Play, Ticket, Share2, Check,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { PremiumLockScreen } from "@/components/shared/PremiumLockScreen";
@@ -14,6 +14,8 @@ interface Plan {
     name: string;
     description?: string | null;
     type: string;
+    shareCode?: string | null;
+    authorName?: string | null;
     isActive: boolean;
     weekCount: number;
     startedAt: string;
@@ -27,7 +29,7 @@ interface Props {
 
 const PREBUILT_TEMPLATES = [
     { id: "ppl", name: "PPL (Push Pull Legs)", desc: "3-day or 6-day split hitting each muscle 2x/wk", icon: "💪" },
-    { id: "pplul", name: "PPL/Upper Lower", desc: "5-day hybrid: PPL + Upper Lower for frequency", icon: "⚡" },
+    { id: "upper_lower_4", name: "Upper/Lower (4 Day)", desc: "4-day split balancing strength and hypertrophy", icon: "⚖️" },
     { id: "arnold", name: "Arnold Split", desc: "6-day chest/back, shoulders/arms, legs split", icon: "🏆" },
     { id: "bro", name: "Bro Split", desc: "Classic 5-day one-muscle-per-day programme", icon: "🔥" },
 ];
@@ -38,6 +40,7 @@ export function PlansClient({ plans, userRole }: Props) {
     const [codeStatus, setCodeStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
     const [codeMsg, setCodeMsg] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const activePlan = plans.find((p) => p.isActive);
 
@@ -65,9 +68,9 @@ export function PlansClient({ plans, userRole }: Props) {
         }
     };
 
-    const redeemCode = async () => {
+    const importPlan = async () => {
         setCodeStatus("loading");
-        const res = await fetch("/api/codes/redeem", {
+        const res = await fetch("/api/plans/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ code }),
@@ -75,8 +78,8 @@ export function PlansClient({ plans, userRole }: Props) {
         const data = await res.json();
         if (res.ok) {
             setCodeStatus("success");
-            setCodeMsg("Code redeemed! Plan assigned and account upgraded.");
-            setTimeout(() => window.location.reload(), 1500);
+            setCodeMsg(`Imported from ${data.author}!`);
+            setTimeout(() => window.location.reload(), 2000);
         } else {
             setCodeStatus("error");
             setCodeMsg(data.error ?? "Invalid code");
@@ -164,6 +167,7 @@ export function PlansClient({ plans, userRole }: Props) {
                                             <p className="font-semibold text-fg truncate">{plan.name}</p>
                                             {plan.isActive && <span className="badge-brand text-[10px]">Active</span>}
                                             {plan.type === "COACH_ASSIGNED" && <span className="badge-success text-[10px]">Coach</span>}
+                                            {plan.authorName && <span className="badge-success text-[10px]">By {plan.authorName}</span>}
                                         </div>
                                         {plan.description && (
                                             <p className="text-sm text-fg-muted truncate">{plan.description}</p>
@@ -175,6 +179,32 @@ export function PlansClient({ plans, userRole }: Props) {
                                             </span>
                                             <span>Started {formatDate(plan.startedAt)}</span>
                                         </div>
+                                        {/* Share code row */}
+                                        {plan.shareCode && (
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <div className="flex items-center gap-2 bg-surface-muted border border-surface-border rounded-xl px-3 py-2 flex-1 min-w-0">
+                                                    <Share2 className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+                                                    <span className="font-mono font-black text-brand-300 text-xs tracking-widest uppercase">{plan.shareCode}</span>
+                                                    <span className="text-[10px] text-fg-subtle ml-1">— Share this code</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(plan.shareCode!);
+                                                        setCopiedId(plan.id);
+                                                        setTimeout(() => setCopiedId(null), 2000);
+                                                    }}
+                                                    className={cn(
+                                                        "btn-sm flex items-center gap-1.5 transition-all shrink-0",
+                                                        copiedId === plan.id
+                                                            ? "bg-success/10 text-success border border-success/30"
+                                                            : "btn-secondary"
+                                                    )}
+                                                >
+                                                    {copiedId === plan.id ? <Check className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
+                                                    {copiedId === plan.id ? "Copied!" : "Copy"}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {!plan.isActive && (
@@ -229,11 +259,40 @@ export function PlansClient({ plans, userRole }: Props) {
 
             {/* Tab: Access Code */}
             {tab === "code" && (
-                <div className="pt-4">
-                    <PremiumLockScreen 
-                        title="Redeem Access Code" 
-                        description="Enter a code from your coach to unlock a tailored plan and automatically upgrade your account to Premium."
-                    />
+                <div className="card p-6 border-brand-500/20 max-w-xl mx-auto mt-10 shadow-glow-brand-sm">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                        <div className="w-16 h-16 bg-brand-400/10 rounded-full flex items-center justify-center mb-2">
+                            <Ticket className="w-8 h-8 text-brand-400 transform -rotate-45" />
+                        </div>
+                        <h3 className="text-xl font-black text-fg tracking-tight">Import a Plan</h3>
+                        <p className="text-sm text-fg-muted max-w-sm mx-auto">
+                            Enter an 8-character share code from any athlete or creator to instantly clone their program directly into your personal library.
+                        </p>
+                        <div className="flex w-full max-w-sm gap-2 mt-4">
+                            <input
+                                placeholder="SHARE CODE"
+                                className="input flex-1 text-center font-mono font-bold uppercase tracking-widest text-sm h-12"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase().trim())}
+                                maxLength={8}
+                            />
+                            <button
+                                onClick={importPlan}
+                                disabled={code.length < 8 || codeStatus === "loading"}
+                                className="btn-primary h-12 px-6"
+                            >
+                                {codeStatus === "loading" ? "..." : "Import"}
+                            </button>
+                        </div>
+                        {codeMsg && (
+                            <p className={cn(
+                                "text-xs font-bold mt-2 uppercase tracking-wider text-center",
+                                codeStatus === "success" ? "text-success" : "text-danger"
+                            )}>
+                                {codeMsg}
+                            </p>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

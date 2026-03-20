@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PLAN_TEMPLATES } from "@/lib/templates";
+import { ExerciseAutocomplete, isCardio } from "@/components/shared/ExerciseAutocomplete";
 
 interface LocalExercise {
     name: string;
@@ -91,6 +92,10 @@ export function PlanCreateClient() {
     }, [templateId, editId]);
 
     const addWorkout = () => {
+        if (workouts.length >= 7) {
+            alert("A plan can have a maximum of 7 training days.");
+            return;
+        }
         const nextIdx = workouts.length;
         
         // Find next available day of week
@@ -120,6 +125,10 @@ export function PlanCreateClient() {
     };
 
     const duplicateWorkout = (idx: number) => {
+        if (workouts.length >= 7) {
+            alert("A plan can have a maximum of 7 training days.");
+            return;
+        }
         const toDup = workouts[idx];
         const next = [...workouts];
         next.splice(idx + 1, 0, {
@@ -283,13 +292,15 @@ export function PlanCreateClient() {
                                     {activeIdx === i && <ChevronRight className="w-4 h-4 text-brand-400" />}
                                 </button>
                             ))}
-                            <button
-                                onClick={addWorkout}
-                                className="w-full py-3 border-2 border-dashed border-surface-border rounded-xl text-xs font-bold text-fg-subtle hover:text-brand-400 hover:border-brand-600/40 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Add New Day
-                            </button>
+                            {workouts.length < 7 && (
+                                <button
+                                    onClick={addWorkout}
+                                    className="w-full py-3 border-2 border-dashed border-surface-border rounded-xl text-xs font-bold text-fg-subtle hover:text-brand-400 hover:border-brand-600/40 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Add New Day
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -374,16 +385,16 @@ export function PlanCreateClient() {
                                                 <div className="flex-1 grid grid-cols-12 gap-4">
                                                     <div className="col-span-12 sm:col-span-6">
                                                         <label className="label-mini block text-[10px] font-black text-fg-subtle uppercase tracking-widest mb-1 px-1">Exercise Name</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="e.g. Incline Bench Press"
-                                                            className="w-full bg-surface-muted border border-surface-border rounded-xl px-4 py-2 text-sm text-fg"
+                                                        <ExerciseAutocomplete
                                                             value={ex.name}
-                                                            onChange={(e) => updateExercise(activeIdx, eIdx, { name: e.target.value })}
+                                                            onChange={(val) => updateExercise(activeIdx, eIdx, { name: val, reps: isCardio(val) ? "20" : "10" })}
+                                                            className="w-full bg-surface-muted border border-surface-border rounded-xl px-4 py-2 text-sm text-fg"
                                                         />
                                                     </div>
                                                     <div className="col-span-6 sm:col-span-2">
-                                                        <label className="label-mini block text-[10px] font-black text-fg-subtle uppercase tracking-widest mb-1 px-1">Sets</label>
+                                                        <label className="label-mini block text-[10px] font-black text-fg-subtle uppercase tracking-widest mb-1 px-1">
+                                                            {isCardio(ex.name) ? "Rounds" : "Sets"}
+                                                        </label>
                                                         <input
                                                             type="number"
                                                             className="w-full bg-surface-muted border border-surface-border rounded-xl px-4 py-2 text-sm text-fg text-center"
@@ -392,10 +403,12 @@ export function PlanCreateClient() {
                                                         />
                                                     </div>
                                                     <div className="col-span-6 sm:col-span-3">
-                                                        <label className="label-mini block text-[10px] font-black text-fg-subtle uppercase tracking-widest mb-1 px-1">Reps</label>
+                                                        <label className="label-mini block text-[10px] font-black text-fg-subtle uppercase tracking-widest mb-1 px-1">
+                                                            {isCardio(ex.name) ? "Mins" : "Reps"}
+                                                        </label>
                                                         <input
                                                             type="text"
-                                                            placeholder="8-12"
+                                                            placeholder={isCardio(ex.name) ? "20" : "8-12"}
                                                             className="w-full bg-surface-muted border border-surface-border rounded-xl px-4 py-2 text-sm text-fg text-center"
                                                             value={ex.reps}
                                                             onChange={(e) => updateExercise(activeIdx, eIdx, { reps: e.target.value })}

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { 
     Scale, MessageSquare, Lock, Plus, 
     ChevronDown, ChevronUp, Check, Star, 
-    Clock, AlertCircle, Video, Play,
+    Clock, AlertCircle, Video, Play, Camera,
     User, Search, Filter, CheckCircle2,
     Send, Calendar, MoreVertical, ChevronRight
 } from "lucide-react";
@@ -23,11 +23,15 @@ interface CheckIn {
     status: "PENDING" | "REVIEWED";
     coachResponse?: string | null;
     respondedAt?: string | null;
-    user?: { name: string; email: string; id: string };
+    user?: { name: string; email: string; id: string; workoutLogs?: any[] };
     sleepRating?: number | null;
     dietRating?: number | null;
     stressRating?: number | null;
     injuryRating?: number | null;
+    energyRating?: number | null;
+    intensityRating?: number | null;
+    frontImageUrl?: string | null;
+    sideImageUrl?: string | null;
 }
 
 interface Props {
@@ -54,6 +58,11 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
     const [dietRating, setDietRating] = useState(0);
     const [stressRating, setStressRating] = useState(0);
     const [injuryRating, setInjuryRating] = useState(0);
+    const [energyRating, setEnergyRating] = useState(0);
+    const [intensityRating, setIntensityRating] = useState(0);
+    const [frontImageUrl, setFrontImageUrl] = useState("");
+    const [sideImageUrl, setSideImageUrl] = useState("");
+    const [activeFormTab, setActiveFormTab] = useState<"metrics" | "photos">("metrics");
     
     // Coach response states
     const [coachResponses, setCoachResponses] = useState<Record<string, string>>({});
@@ -70,6 +79,10 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
         setDietRating(c.dietRating || 0);
         setStressRating(c.stressRating || 0);
         setInjuryRating(c.injuryRating || 0);
+        setEnergyRating(c.energyRating || 0);
+        setIntensityRating(c.intensityRating || 0);
+        setFrontImageUrl(c.frontImageUrl || "");
+        setSideImageUrl(c.sideImageUrl || "");
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
@@ -93,6 +106,10 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                 dietRating: dietRating || undefined,
                 stressRating: stressRating || undefined,
                 injuryRating: injuryRating || undefined,
+                energyRating: energyRating || undefined,
+                intensityRating: intensityRating || undefined,
+                frontImageUrl: frontImageUrl || undefined,
+                sideImageUrl: sideImageUrl || undefined,
             }),
         });
         if (res.ok) {
@@ -133,13 +150,30 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
         );
     }
 
-    const filteredCheckIns = checkIns.filter(c => {
-        const matchesFilter = filter === "ALL" || c.status === filter;
-        const matchesSearch = !searchQuery || 
-            (c.user?.name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (c.feedback.toLowerCase().includes(searchQuery.toLowerCase()));
-        return matchesFilter && matchesSearch;
-    });
+    const currentWeekNumber = getWeekNumber();
+    const hasCurrentWeekLog = checkIns.some(c => c.weekNumber === currentWeekNumber);
+
+    const filteredCheckIns = (() => {
+        const filtered = checkIns.filter(c => {
+            const matchesFilter = filter === "ALL" || c.status === filter;
+            const matchesSearch = !searchQuery ||
+                (c.user?.name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                (c.feedback.toLowerCase().includes(searchQuery.toLowerCase()));
+            return matchesFilter && matchesSearch;
+        });
+
+        // Deduplicate by weekNumber — keep only the most recent entry per week
+        const seen = new Map<number, CheckIn>();
+        for (const c of filtered) {
+            const existing = seen.get(c.weekNumber);
+            if (!existing || new Date(c.createdAt) > new Date(existing.createdAt)) {
+                seen.set(c.weekNumber, c);
+            }
+        }
+        return Array.from(seen.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+    })();
 
     const pendingCount = checkIns.filter(c => c.status === "PENDING").length;
 
@@ -157,7 +191,7 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                     </p>
                 </div>
 
-                {isCoach ? (
+                {isCoach && (
                     <div className="flex items-center gap-2 bg-surface-muted/50 p-1 rounded-2xl border border-surface-border">
                         {(["ALL", "PENDING", "REVIEWED"] as const).map((f) => (
                             <button
@@ -172,14 +206,6 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                             </button>
                         ))}
                     </div>
-                ) : (
-                    <button 
-                        onClick={() => setShowForm(!showForm)} 
-                        className="btn-primary shadow-glow-brand group h-11 px-6 text-sm font-black uppercase tracking-widest"
-                    >
-                        <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform" />
-                        Log Week {getWeekNumber()}
-                    </button>
                 )}
             </div>
 
@@ -204,43 +230,105 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                         <div className="badge-brand text-[10px] font-bold">WEEK {getWeekNumber()}</div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="label uppercase text-[10px] font-black tracking-widest text-brand-400">Biological Metrics</label>
-                                <div className="relative">
-                                    <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-muted" />
-                                    <input 
-                                        type="number" 
-                                        className="input pl-11 font-bold" 
-                                        placeholder="Current Weight (kg)" 
-                                        value={bodyweight}
-                                        onChange={(e) => setBodyweight(e.target.value)} 
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="label uppercase text-[10px] font-black tracking-widest text-brand-400">Media Support</label>
-                                <div className="relative">
-                                    <Video className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-muted" />
-                                    <input 
-                                        type="text" 
-                                        className="input pl-11 text-xs" 
-                                        placeholder="Workout Video URL (Google Drive, YouTube, etc.)" 
-                                        value={videoUrl}
-                                        onChange={(e) => setVideoUrl(e.target.value)} 
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <StarSelector label="Sleep Quality" value={sleepRating} onChange={setSleepRating} />
-                            <StarSelector label="Dietary Control" value={dietRating} onChange={setDietRating} />
-                            <StarSelector label="Stress Load" value={stressRating} onChange={setStressRating} inverse />
-                            <StarSelector label="Pain / Injury" value={injuryRating} onChange={setInjuryRating} inverse />
-                        </div>
+                    <div className="flex items-center gap-1 p-1 bg-surface-muted/50 rounded-2xl w-fit">
+                        <button 
+                            onClick={() => setActiveFormTab("metrics")}
+                            className={cn(
+                                "px-6 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                activeFormTab === "metrics" ? "bg-brand-500 text-white shadow-glow-brand-sm" : "text-fg-subtle hover:text-fg"
+                            )}
+                        >
+                            Session Stats
+                        </button>
+                        <button 
+                            onClick={() => setActiveFormTab("photos")}
+                            className={cn(
+                                "px-6 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                activeFormTab === "photos" ? "bg-brand-500 text-white shadow-glow-brand-sm" : "text-fg-subtle hover:text-fg"
+                            )}
+                        >
+                            Progress Photos
+                        </button>
                     </div>
+
+                    {activeFormTab === "metrics" ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="label uppercase text-[10px] font-black tracking-widest text-brand-400">Bodyweight</label>
+                                    <div className="relative">
+                                        <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-muted" />
+                                        <input 
+                                            type="number" 
+                                            className="input pl-11 font-bold" 
+                                            placeholder="Current Weight (kg)" 
+                                            value={bodyweight}
+                                            onChange={(e) => setBodyweight(e.target.value)} 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <StarSelector label="Sleep Quality" value={sleepRating} onChange={setSleepRating} />
+                                <StarSelector label="Dietary Control" value={dietRating} onChange={setDietRating} />
+                                <StarSelector label="Energy Levels" value={energyRating} onChange={setEnergyRating} />
+                                <StarSelector label="Training Intensity" value={intensityRating} onChange={setIntensityRating} />
+                                <StarSelector label="Stress Load" value={stressRating} onChange={setStressRating} inverse />
+                                <StarSelector label="Pain / Injury" value={injuryRating} onChange={setInjuryRating} inverse />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
+                            {[
+                                { id: "front", label: "Front View", val: frontImageUrl, set: setFrontImageUrl, icon: Camera },
+                                { id: "side", label: "Profile / Side View", val: sideImageUrl, set: setSideImageUrl, icon: Camera }
+                            ].map((p) => (
+                                <div key={p.id} className="space-y-4">
+                                    <label className="label uppercase text-[10px] font-black tracking-widest text-brand-400">{p.label}</label>
+                                    <div className="card p-8 border-dashed flex flex-col items-center justify-center gap-4 hover:border-brand-500/40 transition-all cursor-pointer relative overflow-hidden group min-h-[220px]">
+                                        {p.val ? (
+                                            <>
+                                                <img src={p.val} alt={p.label} className="absolute inset-0 w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <button 
+                                                        onClick={() => p.set("")}
+                                                        className="btn-danger btn-sm uppercase font-black tracking-widest"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p.icon className="w-8 h-8 text-brand-400/30" />
+                                                <div className="text-center">
+                                                    <p className="text-xs font-bold text-fg">Click to upload photo</p>
+                                                    <p className="text-[10px] text-fg-muted mt-1">High quality JPEG or PNG</p>
+                                                </div>
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        const fd = new FormData();
+                                                        fd.append("file", file);
+                                                        const res = await fetch("/api/upload", { method: "POST", body: fd });
+                                                        if (res.ok) {
+                                                            const data = await res.json();
+                                                            p.set(data.url);
+                                                        }
+                                                    }}
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="space-y-4">
                         <div className="space-y-2">
@@ -270,7 +358,7 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                             disabled={!feedback.trim() || saving} 
                             className="btn-primary h-12 flex-1 shadow-glow-brand"
                         >
-                            {saving ? (editId ? "Updating Protocol..." : "Pushing submission...") : (editId ? "Save Corrections" : "Push Submission")}
+                            {saving ? (editId ? "Saving Changes..." : "Pushing submission...") : (editId ? "Save Changes" : "Push Submission")}
                         </button>
                     </div>
                 </div>
@@ -278,7 +366,69 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
 
             {/* List / Cards */}
             <div className="grid grid-cols-1 gap-4">
-                {filteredCheckIns.length === 0 ? (
+                {(!isCoach && filter === "ALL" && !hasCurrentWeekLog && !searchQuery) && (
+                    <div className="card overflow-hidden transition-all duration-300 border bg-surface-card/60 hover:border-surface-border-hover border-surface-border border-dashed">
+                        <div className="w-full flex items-center justify-between p-6">
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center transition-colors shadow-sm bg-surface-muted/50 text-fg-subtle">
+                                    <span className="text-[10px] font-black uppercase tracking-tighter opacity-70">Week</span>
+                                    <span className="text-xl font-black">{currentWeekNumber}</span>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-3">
+                                        <p className="font-black text-lg text-fg tracking-tight">Week {currentWeekNumber} Review</p>
+                                        <div className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-surface-muted text-fg-muted border border-surface-border">
+                                            UNLOGGED
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[10px] text-fg-muted font-bold uppercase tracking-wide">
+                                        <span className="flex items-center gap-1">Not yet submitted</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setEditId(null);
+                                    setBodyweight("");
+                                    setFeedback("");
+                                    setNotes("");
+                                    setSleepRating(0);
+                                    setDietRating(0);
+                                    setEnergyRating(0);
+                                    setIntensityRating(0);
+                                    setStressRating(0);
+                                    setInjuryRating(0);
+                                    setShowForm(true);
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
+                                className="btn-primary shadow-glow-brand group h-10 px-5 text-xs font-black uppercase tracking-widest hidden sm:flex"
+                            >
+                                <Plus className="w-3.5 h-3.5 mr-2 group-hover:rotate-90 transition-transform" />
+                                Log Week {currentWeekNumber}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setEditId(null);
+                                    setBodyweight("");
+                                    setFeedback("");
+                                    setNotes("");
+                                    setSleepRating(0);
+                                    setDietRating(0);
+                                    setEnergyRating(0);
+                                    setIntensityRating(0);
+                                    setStressRating(0);
+                                    setInjuryRating(0);
+                                    setShowForm(true);
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
+                                className="btn-primary shadow-glow-brand group w-10 h-10 p-0 flex items-center justify-center sm:hidden"
+                            >
+                                <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {filteredCheckIns.length === 0 && (hasCurrentWeekLog || isCoach || filter !== "ALL" || !!searchQuery) ? (
                     <div className="card p-20 text-center space-y-4 border-dashed bg-transparent border-surface-border">
                         <div className="w-16 h-16 bg-surface-muted rounded-full flex items-center justify-center mx-auto mb-4">
                             <Filter className="w-8 h-8 text-fg-subtle/30" />
@@ -320,7 +470,7 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                                                 {(!isCoach && c.status === "PENDING") && (
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
-                                                        className="text-[8px] font-black uppercase tracking-widest text-brand-400 hover:text-white transition-colors underline underline-offset-2"
+                                                        className="px-3 py-1 bg-brand-400/10 hover:bg-brand-500 rounded-lg text-[10px] font-black uppercase tracking-widest text-brand-400 hover:text-white transition-colors ml-2"
                                                     >
                                                         Edit
                                                     </button>
@@ -378,12 +528,40 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                                                     </Link>
                                                 </div>
                                             )}
+
+                                            {c.user?.workoutLogs && c.user.workoutLogs.filter((l: any) => l.sets?.length > 0).length > 0 && (
+                                                <div className="space-y-3">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-400">Set-Level Videos</h4>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {c.user.workoutLogs.filter((l: any) => l.sets?.length > 0).map((log: any) => (
+                                                            log.sets.map((s: any) => (
+                                                                <Link
+                                                                    key={`${log.id}-${s.id || s.exercise?.name}`}
+                                                                    href={s.videoUrl}
+                                                                    target="_blank"
+                                                                    className="flex items-center gap-3 p-3 bg-surface-muted/30 border border-surface-border rounded-xl hover:border-brand-500/30 transition-colors group"
+                                                                >
+                                                                    <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center shrink-0">
+                                                                        <Video className="w-3.5 h-3.5 text-Brand-400 group-hover:text-brand-300" />
+                                                                    </div>
+                                                                    <div className="truncate text-left">
+                                                                        <p className="text-xs font-bold text-fg truncate">{s.exercise?.name || "Exercise"}</p>
+                                                                        <p className="text-[9px] text-fg-muted uppercase tracking-wider">{log.workout.name}</p>
+                                                                    </div>
+                                                                </Link>
+                                                            ))
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="space-y-8">
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                                                 <RatingDisplay label="Sleep" val={c.sleepRating} />
                                                 <RatingDisplay label="Diet" val={c.dietRating} />
+                                                <RatingDisplay label="Energy" val={c.energyRating} />
+                                                <RatingDisplay label="Intensity" val={c.intensityRating} />
                                                 <RatingDisplay label="Stress" val={c.stressRating} inverse />
                                                 <RatingDisplay label="Injury" val={c.injuryRating} inverse />
                                             </div>
@@ -449,7 +627,7 @@ export function CheckInsClient({ checkIns: initialCheckIns, isCoach, userRole }:
                                                         {c.status === "REVIEWED" && (
                                                             <div className="flex items-center gap-2 pt-2 border-t border-success-500/10">
                                                                 <Check className="w-3 h-3 text-success" />
-                                                                <span className="text-[10px] font-black text-success uppercase tracking-wider">Protocol Confirmed</span>
+                                                                <span className="text-[10px] font-black text-success uppercase tracking-wider">Review Confirmed</span>
                                                             </div>
                                                         )}
                                                     </div>

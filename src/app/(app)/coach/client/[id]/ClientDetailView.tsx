@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
     Users, Activity, Calendar, MessageSquare,
-    MapPin, Info, Dumbbell, Award, Scale, MoreHorizontal, ChevronRight, CheckCircle2
+    MapPin, Info, Dumbbell, Award, Scale, MoreHorizontal, ChevronRight, CheckCircle2, Edit3
 } from "lucide-react";
 import Link from "next/link";
 import { cn, formatDate, getInitials } from "@/lib/utils";
@@ -106,7 +106,7 @@ export function ClientDetailView({ client, availablePlans, logs, checkIns }: Pro
 
                             {assigning ? (
                                 <div className="mt-6 space-y-3 animate-fade-in bg-surface-muted/50 p-4 rounded-xl border border-surface-border">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-fg-subtle">Select New Protocol</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-fg-subtle">Select New Plan</p>
                                     <div className="flex flex-col gap-2">
                                         {availablePlans.map((p) => (
                                             <button
@@ -128,9 +128,9 @@ export function ClientDetailView({ client, availablePlans, logs, checkIns }: Pro
                                     </button>
                                 </div>
                             ) : (
-                                <div className="mt-8 flex gap-3">
-                                    <Link href={`/plans/${client.activePlan.id}`} className="btn-primary btn-sm flex-1">
-                                        View Detail
+                                <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                                    <Link href={`/plans/create?id=${client.activePlan.id}`} className="btn-primary btn-sm flex-1 flex items-center justify-center gap-2">
+                                        <Edit3 className="w-4 h-4" /> Quick Edit Plan
                                     </Link>
                                     <button 
                                         onClick={() => setAssigning(true)}
@@ -146,7 +146,7 @@ export function ClientDetailView({ client, availablePlans, logs, checkIns }: Pro
                             <p className="text-fg-muted text-sm mb-4">Client has no active plan assigned.</p>
                             {assigning ? (
                                 <div className="space-y-3 animate-fade-in bg-surface-muted/50 p-4 rounded-xl border border-surface-border text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-fg-subtle">Select New Protocol</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-fg-subtle">Select New Plan</p>
                                     <div className="flex flex-col gap-2">
                                         {availablePlans.map((p) => (
                                             <button

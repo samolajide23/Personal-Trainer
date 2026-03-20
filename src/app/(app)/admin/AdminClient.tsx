@@ -54,6 +54,8 @@ export function AdminClient({ users, plans, codes: initialCodes, userRole }: Pro
     const [selectedRole, setSelectedRole] = useState<string>("PREMIUM");
     const [selectedExpiresIn, setSelectedExpiresIn] = useState<string>("0");
     const [promotingId, setPromotingId] = useState<string | null>(null);
+    const [confirmingUser, setConfirmingUser] = useState<{ id: string, email: string, role: string } | null>(null);
+    const [confirmEmail, setConfirmEmail] = useState("");
 
     const generateCode = async () => {
         setGeneratingCode(true);
@@ -106,15 +108,27 @@ export function AdminClient({ users, plans, codes: initialCodes, userRole }: Pro
         }
     };
 
-    const promoteUser = async (userId: string, role: string) => {
+    const promoteUser = async (userId: string, role: string, email: string) => {
+        if (confirmEmail.toLowerCase() !== email.toLowerCase()) {
+            alert("Email mismatch. Evolution denied.");
+            return;
+        }
+
         setPromotingId(userId);
-        await fetch("/api/admin/users/role", {
+        const res = await fetch("/api/admin/users/role", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ userId, role }),
         });
+        
+        if (res.ok) {
+            setConfirmingUser(null);
+            setConfirmEmail("");
+            window.location.reload();
+        } else {
+            alert("Failed to update user status.");
+        }
         setPromotingId(null);
-        window.location.reload();
     };
 
     const stats = [
@@ -173,25 +187,66 @@ export function AdminClient({ users, plans, codes: initialCodes, userRole }: Pro
                                     <p className="text-xs text-fg-muted">{u.email}</p>
                                     <p className="text-xs text-fg-subtle">{formatDate(u.createdAt)}</p>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <span className={roleBadgeClass[u.role]}>{roleLabels[u.role]}</span>
-                                    {u.role === "FREE" && (
-                                        <button
-                                            onClick={() => promoteUser(u.id, "COACH")}
-                                            disabled={promotingId === u.id}
-                                            className="btn-ghost btn-sm text-xs"
-                                        >
-                                            → Coach
-                                        </button>
-                                    )}
-                                    {u.role !== "SUPER_ADMIN" && (
-                                        <button
-                                            onClick={() => promoteUser(u.id, "SUPER_ADMIN")}
-                                            disabled={promotingId === u.id}
-                                            className="btn-ghost btn-sm text-xs text-warning"
-                                        >
-                                            → Admin
-                                        </button>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="flex items-center gap-1.5 p-1 bg-surface-muted rounded-xl border border-surface-border">
+                                        {["FREE", "PREMIUM", "COACH", "SUPER_ADMIN"].map((r) => {
+                                            const isActive = u.role === r;
+                                            return (
+                                                <button
+                                                    key={r}
+                                                    onClick={() => !isActive && setConfirmingUser({ id: u.id, email: u.email, role: r })}
+                                                    className={cn(
+                                                        "px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                                        isActive 
+                                                            ? roleBadgeClass[r] + " shadow-sm scale-105 z-10" 
+                                                            : "text-fg-subtle hover:text-fg hover:bg-surface-elevated"
+                                                    )}
+                                                >
+                                                    {roleLabels[r].replace(" Member", "")}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {confirmingUser?.id === u.id && (
+                                        <div className="mt-3 p-4 bg-surface-card rounded-2xl border-2 border-brand-500/20 shadow-glow-brand-sm space-y-4 animate-slide-up max-w-[300px] relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-brand" />
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-brand-400">
+                                                    Authorization Required
+                                                </p>
+                                                <p className="text-xs text-fg-muted leading-relaxed">
+                                                    You are transitioning <strong>{u.name || "User"}</strong> to <strong>{confirmingUser.role}</strong> status.
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-fg-subtle uppercase tracking-widest ml-1">Confirm Recipient Email</label>
+                                                <input 
+                                                    type="email"
+                                                    placeholder={u.email}
+                                                    className="input input-sm text-xs font-mono"
+                                                    value={confirmEmail}
+                                                    onChange={(e) => setConfirmEmail(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="flex gap-2 pt-2">
+                                                <button 
+                                                    onClick={() => promoteUser(u.id, confirmingUser.role, u.email)}
+                                                    disabled={promotingId === u.id || !confirmEmail}
+                                                    className="btn-primary btn-sm flex-1 text-[10px] font-black uppercase tracking-widest h-10 shadow-glow-brand-sm"
+                                                >
+                                                    {promotingId === u.id ? "Processing..." : "Authorize Change"}
+                                                </button>
+                                                <button 
+                                                    onClick={() => { setConfirmingUser(null); setConfirmEmail(""); }}
+                                                    className="btn-secondary btn-sm text-[10px] font-black uppercase tracking-widest h-10 px-4"
+                                                >
+                                                    Abort
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>

@@ -13,6 +13,10 @@ const checkInSchema = z.object({
     dietRating: z.number().min(1).max(5).optional(),
     stressRating: z.number().min(1).max(5).optional(),
     injuryRating: z.number().min(1).max(5).optional(),
+    energyRating: z.number().min(1).max(5).optional(),
+    intensityRating: z.number().min(1).max(5).optional(),
+    frontImageUrl: z.string().optional(),
+    sideImageUrl: z.string().optional(),
 });
 
 // POST submit a check-in
@@ -30,6 +34,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const parsed = checkInSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+    const existingWeek = await prisma.checkIn.findFirst({
+        where: { userId: user.id, weekNumber: parsed.data.weekNumber },
+    });
+    if (existingWeek) return NextResponse.json({ error: "Check-in for this week already exists." }, { status: 400 });
 
     const checkIn = await prisma.checkIn.create({
         data: { userId: user.id, ...parsed.data, status: "PENDING" },
@@ -62,7 +71,25 @@ export async function GET(req: Request) {
 
     const checkIns = await prisma.checkIn.findMany({
         where,
-        include: { user: { select: { name: true, email: true } } },
+        include: { 
+            user: { 
+                select: { 
+                    name: true, 
+                    email: true,
+                    workoutLogs: {
+                        take: 15,
+                        orderBy: { loggedAt: "desc" },
+                        include: {
+                            workout: { select: { name: true } },
+                            sets: {
+                                where: { videoUrl: { not: null } },
+                                include: { exercise: { select: { name: true } } }
+                            }
+                        }
+                    }
+                } 
+            } 
+        },
         orderBy: { createdAt: "desc" },
     });
 
@@ -78,7 +105,7 @@ export async function PATCH(req: Request) {
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const body = await req.json();
-    const { id, coachResponse, status, feedback, notes, videoUrl, bodyweightKg, sleepRating, dietRating, stressRating, injuryRating } = body;
+    const { id, coachResponse, status, feedback, notes, videoUrl, bodyweightKg, sleepRating, dietRating, stressRating, injuryRating, energyRating, intensityRating, frontImageUrl, sideImageUrl } = body;
     
     const existing = await prisma.checkIn.findUnique({
         where: { id },
@@ -116,6 +143,10 @@ export async function PATCH(req: Request) {
             dietRating,
             stressRating,
             injuryRating,
+            energyRating,
+            intensityRating,
+            frontImageUrl,
+            sideImageUrl,
         };
     }
     

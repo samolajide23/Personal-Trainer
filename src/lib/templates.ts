@@ -165,5 +165,58 @@ export const PLAN_TEMPLATES: Record<string, Template> = {
             { name: "Leg Day", dayNumber: 4, exercises: [{ name: "Squats", sets: 4, reps: "10" }, { name: "Leg Press", sets: 3, reps: "12" }, { name: "Leg Extensions", sets: 3, reps: "15" }, { name: "Hamstring Curls", sets: 3, reps: "15" }] },
             { name: "Arm Day", dayNumber: 5, exercises: [{ name: "Barbell Curls", sets: 4, reps: "10" }, { name: "Skull Crushers", sets: 4, reps: "10" }, { name: "Hammer Curls", sets: 3, reps: "12" }, { name: "Pushdowns", sets: 3, reps: "12" }] }
         ]
+    },
+    upper_lower_4: {
+        id: "upper_lower_4",
+        name: "Upper/Lower 4-Day Split",
+        description: "A highly effective 4-day split striking the perfect balance between frequency and recovery.",
+        workouts: [
+            {
+                name: "Upper Body (Strength)",
+                dayNumber: 1,
+                exercises: [
+                    { name: "Barbell Bench Press", sets: 4, reps: "5-8" },
+                    { name: "Barbell Rows", sets: 4, reps: "5-8" },
+                    { name: "Overhead Military Press", sets: 3, reps: "8-10" },
+                    { name: "Lat Pulldowns", sets: 3, reps: "8-10" },
+                    { name: "Seated Dumbbell Curls", sets: 3, reps: "10-12" },
+                    { name: "Tricep Pushdowns", sets: 3, reps: "10-12" }
+                ]
+            },
+            {
+                name: "Lower Body (Strength)",
+                dayNumber: 2,
+                exercises: [
+                    { name: "Barbell Squats", sets: 4, reps: "5-8" },
+                    { name: "Romanian Deadlifts", sets: 4, reps: "8-10" },
+                    { name: "Leg Press", sets: 3, reps: "10-12" },
+                    { name: "Leg Curls", sets: 3, reps: "10-12" },
+                    { name: "Standing Calf Raises", sets: 4, reps: "15" }
+                ]
+            },
+            {
+                name: "Upper Body (Hypertrophy)",
+                dayNumber: 3,
+                exercises: [
+                    { name: "Incline Dumbbell Press", sets: 3, reps: "10-12" },
+                    { name: "Seated Cable Rows", sets: 3, reps: "10-12" },
+                    { name: "Dumbbell Lateral Raises", sets: 4, reps: "12-15" },
+                    { name: "Face Pulls", sets: 3, reps: "15" },
+                    { name: "Hammer Curls", sets: 3, reps: "12" },
+                    { name: "Overhead Tricep Extensions", sets: 3, reps: "12" }
+                ]
+            },
+            {
+                name: "Lower Body (Hypertrophy)",
+                dayNumber: 4,
+                exercises: [
+                    { name: "Bulgarian Split Squats", sets: 3, reps: "10-12" },
+                    { name: "Leg Extensions", sets: 3, reps: "12-15" },
+                    { name: "Lying Leg Curls", sets: 3, reps: "12-15" },
+                    { name: "Walking Lunges", sets: 3, reps: "12 steps" },
+                    { name: "Seated Calf Raises", sets: 4, reps: "15-20" }
+                ]
+            }
+        ]
     }
 };

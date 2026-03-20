@@ -62,7 +62,9 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
     // Selection details
     const selectedDate = selectedDay ? new Date(view.year, view.month, selectedDay) : today;
     const selectedLog = logMap[selectedDate.toDateString()];
-    const selectedPlanned = planDayMap[(selectedDate.getDay() === 0 ? 6 : selectedDate.getDay() - 1)];
+    
+    const isSelectedPast = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const selectedPlanned = !isSelectedPast ? planDayMap[(selectedDate.getDay() === 0 ? 6 : selectedDate.getDay() - 1)] : null;
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in pb-20">
@@ -112,7 +114,7 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
                             const currentDow = dateObj ? (dateObj.getDay() === 0 ? 6 : dateObj.getDay() - 1) : null;
                             const log = day ? logMap[dateObj!.toDateString()] : null;
                             
-                            // Temporal Rule: Only show planned protocol for TODAY and FUTURE
+                            // Temporal Rule: Only show planned plan for TODAY and FUTURE
                             // For the PAST, we only show verified LOGS (Reality)
                             const isPast = dateObj ? (new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()) < new Date(today.getFullYear(), today.getMonth(), today.getDate())) : false;
                             const planned = (!isPast && day && currentDow !== null) ? planDayMap[currentDow] : null;
@@ -174,15 +176,15 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
             </div>
 
             {/* Sidebar Details Panel */}
-            <div className="lg:col-span-4 space-y-6">
-                <div className="card p-6 border-brand-500/20 bg-gradient-to-br from-surface-card to-brand-950/20 shadow-glow-sm sticky top-10">
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-10 lg:h-fit">
+                <div className="card p-6 border-brand-500/20 bg-gradient-to-br from-surface-card to-brand-950/20 shadow-glow-sm">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center border border-surface-border">
                                 <History className="w-5 h-5 text-brand-400" />
                             </div>
                             <div>
-                                <h3 className="text-sm font-black text-fg uppercase tracking-widest">{selectedDate.toDateString() === today.toDateString() ? "Today's Status" : "Day Audit"}</h3>
+                                <h3 className="text-sm font-black text-fg uppercase tracking-widest">{selectedDate.toDateString() === today.toDateString() ? "Today's Status" : "Session Detail"}</h3>
                                 <p className="text-[10px] text-fg-muted font-bold">{selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</p>
                             </div>
                         </div>
@@ -208,7 +210,7 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
 
                                     {/* Exercises List */}
                                     <div className="space-y-2">
-                                        <p className="text-[10px] font-bold text-fg-subtle uppercase px-2 mb-2 tracking-[0.1em]">Protocol Executed</p>
+                                        <p className="text-[10px] font-bold text-fg-subtle uppercase px-2 mb-2 tracking-[0.1em]">Plan Executed</p>
                                         {selectedLog.exercises.map((ex, i) => (
                                             <div key={i} className="flex items-center gap-3 py-2 border-b border-surface-border/30 last:border-none px-2 group">
                                                 <div className="w-1 h-1 rounded-full bg-success transition-transform group-hover:scale-150" />
@@ -224,7 +226,7 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
                                             <Clock className="w-4 h-4 text-white" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black text-brand-400 uppercase tracking-widest mb-0.5">Protocol Assigned</p>
+                                            <p className="text-[10px] font-black text-brand-400 uppercase tracking-widest mb-0.5">Plan Assigned</p>
                                             <p className="text-sm font-bold text-fg tracking-tight">{selectedPlanned.name}</p>
                                         </div>
                                     </div>
@@ -243,7 +245,7 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
                                     {(selectedDate.toDateString() === today.toDateString()) && (
                                         <Link href="/plans/log" className="btn-primary w-full h-11 text-[10px] font-bold uppercase tracking-widest shadow-glow-brand group">
                                             <PlayCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                                            Execute Protocol
+                                            Execute Plan
                                         </Link>
                                     )}
                                 </div>
@@ -253,7 +255,7 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
                                         <Info className="w-6 h-6 text-fg-subtle" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-bold text-fg uppercase tracking-widest">Protocol Deviation</p>
+                                        <p className="text-[10px] font-bold text-fg uppercase tracking-widest">Plan Deviation</p>
                                         <p className="text-xs text-fg-muted">Rest optimization or unscheduled effort for this day.</p>
                                     </div>
                                 </div>
@@ -262,40 +264,25 @@ export function CalendarClient({ activePlan, loggedDates }: Props) {
                     </div>
                 </div>
 
-                {/* Training Insights Area */}
+                {/* Training Summary Area */}
                 <div className="card p-6 space-y-4 bg-surface-muted/30">
                     <h4 className="text-[10px] font-black uppercase text-fg-subtle tracking-[0.2em] mb-2 flex items-center gap-2">
                         <Activity className="w-3 h-3 text-brand-400" />
-                        Platform Telemetry
+                        Monthly Snapshot
                     </h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="p-4 bg-surface-card/50 rounded-2xl border border-surface-border flex flex-col justify-between h-24">
-                            <p className="text-[8px] font-bold text-fg-muted uppercase">Weekly Volume</p>
-                            <div className="space-y-1">
-                                <p className="text-lg font-black text-fg tracking-tight leading-none">84 <span className="text-[8px] font-normal opacity-50 uppercase">Sets</span></p>
-                                <div className="w-full h-1 bg-surface-muted rounded-full overflow-hidden">
-                                    <div className="w-[84%] h-full bg-brand-400" />
-                                </div>
-                            </div>
+                            <p className="text-[8px] font-bold text-fg-muted uppercase">All Time Workouts</p>
+                            <p className="text-3xl font-black text-fg tracking-tight">{loggedDates.length}</p>
+                            <p className="text-[10px] text-fg-subtle uppercase font-bold">Total Sessions</p>
                         </div>
                         <div className="p-4 bg-surface-card/50 rounded-2xl border border-surface-border flex flex-col justify-between h-24">
-                            <p className="text-[8px] font-bold text-fg-muted uppercase">PR Delta</p>
-                            <div className="space-y-1">
-                                <p className="text-lg font-black text-success tracking-tight leading-none">+2.4%</p>
-                                <div className="w-full h-1 bg-surface-muted rounded-full overflow-hidden">
-                                    <div className="w-[60%] h-full bg-success" />
-                                </div>
-                            </div>
+                            <p className="text-[8px] font-bold text-fg-muted uppercase">This Month</p>
+                            <p className="text-3xl font-black text-brand-400 tracking-tight">
+                                {loggedDates.filter(l => new Date(l.date).getMonth() === view.month && new Date(l.date).getFullYear() === view.year).length}
+                            </p>
+                            <p className="text-[10px] text-brand-400/60 uppercase font-bold">Sessions Logged</p>
                         </div>
-                    </div>
-                    <div className="p-4 bg-brand-400/5 border border-brand-400/10 rounded-2xl flex items-center justify-between group cursor-default">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-brand-950/20 rounded-lg">
-                                <Flame className="w-4 h-4 text-brand-400 animate-pulse" />
-                            </div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-fg">Intensity Streak</p>
-                        </div>
-                        <p className="text-lg font-black text-brand-400 tracking-tighter">14 <span className="text-[8px] font-bold text-fg-subtle">DAYS</span></p>
                     </div>
                 </div>
             </div>

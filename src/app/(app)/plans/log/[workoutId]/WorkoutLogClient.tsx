@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
     ChevronLeft, Timer, Flame, Check, HelpCircle,
-    Trash2, Plus, Info, InfoIcon, Award
+    Trash2, Plus, Info, InfoIcon, Award, Video, Play
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isCardio } from "@/components/shared/ExerciseAutocomplete";
 
 interface Exercise {
     id: string;
@@ -29,19 +30,26 @@ interface SetLog {
     weightKg: string;
     isCompleted: boolean;
     isWarmup: boolean;
+    videoUrl?: string;
+    isUploading?: boolean;
 }
 
 interface Props {
     workout: Workout;
+    tutorialUrls?: Record<string, string>;
 }
 
-export function WorkoutLogClient({ workout }: Props) {
+export function WorkoutLogClient({ workout, tutorialUrls = {} }: Props) {
     const router = useRouter();
     const [logs, setLogs] = useState<Record<string, SetLog[]>>({});
     const [startTime] = useState(Date.now());
     const [elapsed, setElapsed] = useState(0);
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    const [showFinishModal, setShowFinishModal] = useState(false);
+    const [manualDurationMinutes, setManualDurationMinutes] = useState("");
+    const [workoutNotes, setWorkoutNotes] = useState("");
 
     // Initialize logs from workout data or fetch existing IN_PROGRESS log
     useEffect(() => {
@@ -63,6 +71,7 @@ export function WorkoutLogClient({ workout }: Props) {
                                 weightKg: s.weightKg?.toString() ?? "",
                                 isCompleted: s.isCompleted,
                                 isWarmup: s.isWarmup,
+                                videoUrl: s.videoUrl,
                             });
                         }
                     });
@@ -112,6 +121,7 @@ export function WorkoutLogClient({ workout }: Props) {
                 weightKg: s.weightKg ? parseFloat(s.weightKg) : undefined,
                 isWarmup: s.isWarmup,
                 isCompleted: s.isCompleted,
+                videoUrl: s.videoUrl,
             }))
         );
 
@@ -136,11 +146,33 @@ export function WorkoutLogClient({ workout }: Props) {
                 ...prev,
                 [exId]: prev[exId].map((set, i) => i === setIdx ? { ...set, ...updates } : set),
             };
-            if (Object.keys(updates).some(k => ["isCompleted", "weightKg", "reps"].includes(k))) {
+            if (Object.keys(updates).some(k => ["isCompleted", "weightKg", "reps", "videoUrl"].includes(k))) {
                 saveProgress(next);
             }
             return next;
         });
+    };
+
+    const handleUploadVideo = async (exId: string, setIdx: number, file: File | undefined) => {
+        if (!file) return;
+        try {
+            updateSet(exId, setIdx, { isUploading: true });
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            
+            if (res.ok) {
+                const { url } = await res.json();
+                updateSet(exId, setIdx, { videoUrl: url, isUploading: false });
+            } else {
+                updateSet(exId, setIdx, { isUploading: false });
+                alert("Upload failed.");
+            }
+        } catch(e) {
+            console.error(e);
+            updateSet(exId, setIdx, { isUploading: false });
+            alert("Error uploading video.");
+        }
     };
 
     const addSet = (exId: string) => {
@@ -176,10 +208,21 @@ export function WorkoutLogClient({ workout }: Props) {
         });
     };
 
+    const handleInitiateFinish = () => {
+        const flattenedSets = Object.entries(logs).flatMap(([exId, sets]) =>
+            sets.map(s => ({ ...s, exerciseId: exId }))
+        );
+        if (!flattenedSets.some(s => s.isCompleted)) {
+            alert("Finish at least one set!");
+            return;
+        }
+        setManualDurationMinutes(Math.floor(elapsed / 60).toString());
+        setShowFinishModal(true);
+    };
+
     const handleSubmit = async () => {
         setSaving(true);
         const flattenedSets = Object.entries(logs).flatMap(([exId, sets]) =>
-            // Keep all sets but status reflects completion
             sets.map(s => ({
                 exerciseId: exId,
                 setNumber: s.setNumber,
@@ -187,22 +230,19 @@ export function WorkoutLogClient({ workout }: Props) {
                 weightKg: s.weightKg ? parseFloat(s.weightKg) : undefined,
                 isWarmup: s.isWarmup,
                 isCompleted: s.isCompleted,
+                videoUrl: s.videoUrl,
             }))
         );
 
-        if (!flattenedSets.some(s => s.isCompleted)) {
-            alert("Finish at least one set!");
-            setSaving(false);
-            return;
-        }
-
         try {
+            const finalDuration = parseInt(manualDurationMinutes) || Math.floor(elapsed / 60);
             const res = await fetch("/api/logs", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     workoutId: workout.id,
-                    duration: Math.floor(elapsed / 60),
+                    duration: finalDuration,
+                    notes: workoutNotes.trim() || undefined,
                     status: "COMPLETED",
                     sets: flattenedSets,
                 }),
@@ -240,7 +280,7 @@ export function WorkoutLogClient({ workout }: Props) {
                         {formatTime(elapsed)}
                     </div>
                 </div>
-                <button onClick={handleSubmit} disabled={saving} className="btn-primary btn-sm px-4 shadow-glow-brand">
+                <button onClick={handleInitiateFinish} disabled={saving} className="btn-primary btn-sm px-4 shadow-glow-brand">
                     Finish
                 </button>
             </div>
@@ -254,16 +294,26 @@ export function WorkoutLogClient({ workout }: Props) {
                                     <h3 className="font-bold text-fg text-base">{ex.name}</h3>
                                     {ex.notes && <p className="text-xs text-fg-muted mt-0.5">{ex.notes}</p>}
                                 </div>
-                                <button className="text-fg-subtle p-1 hover:text-fg transition-colors">
-                                    <InfoIcon className="w-4 h-4" />
-                                </button>
+                                {tutorialUrls[ex.name] ? (
+                                    <a
+                                        href={tutorialUrls[ex.name]}
+                                        target="_blank"
+                                        className="btn-secondary btn-sm flex items-center gap-1.5 text-[10px] uppercase font-black text-brand-400 border-brand-500/20 hover:bg-brand-500 hover:text-white transition-colors"
+                                    >
+                                        <Play className="w-3 h-3 fill-current" /> Tutorial
+                                    </a>
+                                ) : (
+                                    <button className="text-fg-subtle p-1 hover:text-fg transition-colors">
+                                        <InfoIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
 
                             <div className="space-y-2">
                                 <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-fg-subtle uppercase px-2 mb-1">
-                                    <div className="col-span-1 text-center">Set</div>
-                                    <div className="col-span-4 text-center">Weight</div>
-                                    <div className="col-span-4 text-center">Reps</div>
+                                    <div className="col-span-1 text-center">{isCardio(ex.name) ? "Rd" : "Set"}</div>
+                                    <div className="col-span-4 text-center">{isCardio(ex.name) ? "Lvl/Spd" : "Weight"}</div>
+                                    <div className="col-span-4 text-center">{isCardio(ex.name) ? "Mins" : "Reps"}</div>
                                     <div className="col-span-3 text-center">Check</div>
                                 </div>
 
@@ -297,7 +347,9 @@ export function WorkoutLogClient({ workout }: Props) {
                                                     value={set.weightKg}
                                                     onChange={(e) => updateSet(ex.id, sIdx, { weightKg: e.target.value })}
                                                 />
-                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-fg-subtle pointer-events-none">kg</span>
+                                                {!isCardio(ex.name) && (
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-fg-subtle pointer-events-none">kg</span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -310,11 +362,26 @@ export function WorkoutLogClient({ workout }: Props) {
                                             />
                                         </div>
 
-                                        <div className="col-span-3 flex items-center gap-1">
+                                        <div className="col-span-3 flex items-center justify-end gap-1">
+                                            <label className="cursor-pointer">
+                                                <input 
+                                                    type="file" 
+                                                    accept="video/*" 
+                                                    className="hidden" 
+                                                    onChange={(e) => handleUploadVideo(ex.id, sIdx, e.target.files?.[0])}
+                                                />
+                                                <div className={cn(
+                                                    "w-8 h-9 rounded-lg flex items-center justify-center transition-all",
+                                                    set.isUploading ? "animate-pulse bg-brand-500/20 text-brand-400" :
+                                                    set.videoUrl ? "bg-brand-500/20 text-brand-400" : "bg-surface-elevated text-fg-muted hover:bg-brand-950/20 hover:text-brand-400"
+                                                )}>
+                                                    <Video className="w-3.5 h-3.5" />
+                                                </div>
+                                            </label>
                                             <button
                                                 onClick={() => updateSet(ex.id, sIdx, { isCompleted: !set.isCompleted })}
                                                 className={cn(
-                                                    "flex-1 h-9 rounded-lg flex items-center justify-center transition-all",
+                                                    "w-8 h-9 rounded-lg flex items-center justify-center transition-all",
                                                     set.isCompleted
                                                         ? "bg-success text-white shadow-glow-success"
                                                         : "bg-surface-elevated text-fg-muted hover:bg-brand-950/20 hover:text-brand-400"
@@ -347,13 +414,62 @@ export function WorkoutLogClient({ workout }: Props) {
 
             <div className="fixed bottom-0 inset-x-0 p-4 bg-surface p-safe-area lg:hidden border-t border-surface-border glass">
                 <button
-                    onClick={handleSubmit}
-                    disabled={saving}
+                    onClick={handleInitiateFinish}
                     className="btn-primary w-full h-12 text-base shadow-glow-brand"
                 >
-                    {saving ? "Signing off..." : "Finish Workout"}
+                    Finish Workout
                 </button>
             </div>
+
+            {showFinishModal && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 animate-fade-in p-4">
+                    <div className="bg-surface-card w-full max-w-sm rounded-[2rem] p-6 space-y-6 animate-slide-up border border-surface-border">
+                        <div className="text-center space-y-2">
+                            <div className="w-16 h-16 bg-brand-500/10 rounded-full flex items-center justify-center mx-auto mb-2 shadow-glow-brand-sm">
+                                <Award className="w-8 h-8 text-brand-400" />
+                            </div>
+                            <h3 className="text-2xl font-black text-fg tracking-tighter uppercase">Workout Complete!</h3>
+                            <p className="text-xs text-fg-subtle font-medium">Review your session details below.</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-fg-subtle px-1">Duration (Minutes)</label>
+                                <div className="relative">
+                                    <Timer className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-muted" />
+                                    <input
+                                        type="number"
+                                        className="input pl-12 h-12 text-lg font-bold"
+                                        value={manualDurationMinutes}
+                                        onChange={(e) => setManualDurationMinutes(e.target.value)}
+                                        placeholder="e.g. 45"
+                                    />
+                                    <p className="text-[9px] text-fg-subtle mt-1 px-1">Adjust if you forgot to end the timer</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-fg-subtle px-1">Notes (Optional)</label>
+                                <textarea
+                                    className="input h-20 text-sm py-3 resize-none"
+                                    placeholder="Felt great, hit a PR on bench..."
+                                    value={workoutNotes}
+                                    onChange={(e) => setWorkoutNotes(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button onClick={() => setShowFinishModal(false)} className="btn-secondary h-12 flex-1" disabled={saving}>
+                                Back
+                            </button>
+                            <button onClick={handleSubmit} className="btn-primary h-12 flex-[2] shadow-glow-brand" disabled={saving}>
+                                {saving ? "Saving..." : "Save Session"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

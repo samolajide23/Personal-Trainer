@@ -47,7 +47,7 @@ const msgSchema = z.object({
     receiverId: z.string().optional(),
     isGeneral: z.boolean().default(false),
     type: z.enum(["TEXT", "IMAGE", "VIDEO"]).default("TEXT"),
-    mediaUrl: z.string().url().optional(),
+    mediaUrl: z.string().optional(), // accepts relative /uploads/... paths
 });
 
 // POST send a message
@@ -64,8 +64,6 @@ export async function POST(req: Request) {
 
     const { content, receiverId, isGeneral, type, mediaUrl } = parsed.data;
 
-    // Free users can now access general chat per request.
-
     const message = await prisma.message.create({
         data: {
             senderId: user.id,
@@ -81,4 +79,54 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(message, { status: 201 });
+}
+
+// PATCH edit a message — only allowed within 2 minutes of sending
+export async function PATCH(req: Request) {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    const { id, content } = await req.json();
+    if (!id || !content?.trim()) return NextResponse.json({ error: "Missing id or content" }, { status: 400 });
+
+    const msg = await prisma.message.findUnique({ where: { id } });
+    if (!msg) return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    if (msg.senderId !== user.id) return NextResponse.json({ error: "Not your message" }, { status: 403 });
+    if (msg.type !== "TEXT") return NextResponse.json({ error: "Can only edit text messages" }, { status: 400 });
+
+    // 2-minute edit window
+    const ageMs = Date.now() - new Date(msg.createdAt).getTime();
+    if (ageMs > 2 * 60 * 1000) {
+        return NextResponse.json({ error: "Edit window expired (2 minutes)" }, { status: 403 });
+    }
+
+    const updated = await prisma.message.update({
+        where: { id },
+        data: { content: content.trim(), updatedAt: new Date() },
+        include: { sender: { select: { id: true, name: true, avatarUrl: true, role: true } } },
+    });
+
+    return NextResponse.json(updated);
+}
+
+// DELETE a message — only the sender can delete their own
+export async function DELETE(req: Request) {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    const { id } = await req.json();
+    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+    const msg = await prisma.message.findUnique({ where: { id } });
+    if (!msg) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (msg.senderId !== user.id) return NextResponse.json({ error: "Not your message" }, { status: 403 });
+
+    await prisma.message.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
 }

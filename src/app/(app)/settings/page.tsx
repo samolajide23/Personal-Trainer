@@ -12,7 +12,11 @@ export default async function SettingsPage() {
 
     const user = await prisma.user.findUnique({
         where: { clerkId: userId },
-        select: { name: true, email: true, role: true, onboardingDone: true, avatarUrl: true },
+        select: {
+            name: true, email: true, role: true, onboardingDone: true, avatarUrl: true,
+            goal: true, trainingDaysPerWeek: true, experienceLevel: true, trainingLocation: true,
+            targetWeightKg: true, weightKg: true,
+        },
     });
 
     if (!user) redirect("/sign-in");

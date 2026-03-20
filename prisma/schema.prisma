@@ -221,6 +221,7 @@ model LogSet {
   isWarmup     Boolean @default(false)
   isCompleted  Boolean @default(true)
   isPR         Boolean @default(false)
+  videoUrl     String? // Add video upload per set
 
   workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
   exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
@@ -252,12 +253,24 @@ model CheckIn {
   dietRating    Int?
   stressRating  Int?
   injuryRating  Int?
+  energyRating  Int?
+  intensityRating Int?
   
   createdAt     DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("check_ins")
+}
+
+model GlobalExercise {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  videoUrl    String?
+  muscleGroup String?
+  createdAt   DateTime @default(now())
+
+  @@map("global_exercises")
 }
 
 model Message {

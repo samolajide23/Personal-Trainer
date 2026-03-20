@@ -81,7 +81,7 @@ export const roleLabels: Record<string, string> = {
     FREE: "Free",
     PREMIUM: "Premium",
     COACH: "Coach",
-    SUPER_ADMIN: "Coach",
+    SUPER_ADMIN: "Admin",
 };
 
 /** Role badge variants */

@@ -18,6 +18,7 @@ export default async function PlansPage() {
                     plan: {
                         include: {
                             _count: { select: { weeks: true } },
+                            creator: { select: { name: true } },
                             weeks: {
                                 include: { _count: { select: { workouts: true } } },
                                 take: 1,
@@ -33,16 +34,32 @@ export default async function PlansPage() {
 
     if (!user) redirect("/onboarding");
 
-    const plans = user.plans.map((up) => ({
-        id: up.plan.id,
-        name: up.plan.name,
-        description: up.plan.description,
-        type: up.plan.type,
-        isActive: up.isActive,
-        weekCount: up.plan._count.weeks,
-        startedAt: up.startedAt.toISOString(),
-        tags: up.plan.tags,
-    }));
+    const plans = user.plans.map((up) => {
+        const isImported = up.plan.name.includes("(Imported)");
+        const isSomeoneElsesPlan = up.plan.creatorId !== user.id;
+
+        let authorName: string | null = null;
+        if (isSomeoneElsesPlan) {
+            // Imported from another user
+            authorName = up.plan.creator?.name ?? "Unknown";
+        } else if (isImported) {
+            // User imported their own plan via share code
+            authorName = "you";
+        }
+
+        return {
+            id: up.plan.id,
+            name: up.plan.name,
+            description: up.plan.description,
+            type: up.plan.type,
+            shareCode: up.plan.shareCode,
+            authorName,
+            isActive: up.isActive,
+            weekCount: up.plan._count.weeks,
+            startedAt: up.startedAt.toISOString(),
+            tags: up.plan.tags,
+        };
+    });
 
     return (
         <>

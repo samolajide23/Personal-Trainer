@@ -14,6 +14,8 @@ import {
     Zap,
     ShieldCheck,
     Users,
+    Video,
+    Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +35,9 @@ const navItems: NavItem[] = [
     { href: "/checkins", label: "Check-ins", icon: ClipboardList },
     { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/admin", label: "Admin", icon: ShieldCheck, roles: ["SUPER_ADMIN"] },
+    { href: "/admin/exercises", label: "Exercises", icon: Video, roles: ["SUPER_ADMIN"] },
     { href: "/coach", label: "Coach Panel", icon: Users, roles: ["COACH", "SUPER_ADMIN"] },
+    { href: "/donate", label: "Support Mission", icon: Heart },
 ];
 
 interface SidebarProps {

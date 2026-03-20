@@ -17,6 +17,7 @@ const logSchema = z.object({
         rpe: z.number().min(1).max(10).optional(),
         isWarmup: z.boolean().default(false),
         isCompleted: z.boolean().default(true),
+        videoUrl: z.string().optional(),
     })),
 });
 
@@ -78,6 +79,7 @@ export async function POST(req: Request) {
                     isWarmup: s.isWarmup,
                     isCompleted: s.isCompleted,
                     isPR: prExerciseIds.has(s.exerciseId),
+                    videoUrl: s.videoUrl,
                 })),
             },
         },

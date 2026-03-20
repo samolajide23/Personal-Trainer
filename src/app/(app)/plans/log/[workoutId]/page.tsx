@@ -16,6 +16,13 @@ export default async function WorkoutLogPage({ params }: { params: { workoutId: 
 
     if (!workout) notFound();
 
+    // Tutorials map
+    const globalEx = await prisma.globalExercise.findMany({ where: { videoUrl: { not: null } } });
+    const tutorialUrls = globalEx.reduce((acc: any, ex: any) => {
+        acc[ex.name] = ex.videoUrl;
+        return acc;
+    }, {} as Record<string, string>);
+
     // Basic check for plan ownership
     // (In production, ensure the user belongs to the plan containing this workout)
 
@@ -34,6 +41,7 @@ export default async function WorkoutLogPage({ params }: { params: { workoutId: 
                         notes: ex.notes,
                     })),
                 }}
+                tutorialUrls={tutorialUrls}
             />
         </div>
     );
